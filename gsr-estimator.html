@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>GSR Cost Estimator</title>
+<script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.2/dist/html2pdf.bundle.min.js" defer></script>
 <style>
 :root {
   --green: #006845;
@@ -96,6 +97,7 @@ table.gsr-summary-table tr.total-row td { font-weight: 700; font-size: 16px; bor
 .gsr-info-box { background: var(--green-light); border: 1px solid var(--green-mid); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 18px; font-size: 13px; color: var(--green-dark); line-height: 1.5; }
 .gsr-disclaimer { font-size: 12px; color: #777; font-style: italic; margin-bottom: 22px; line-height: 1.5; }
 .gsr-disclaimer a { color: var(--green); }
+.gsr-submit-help { font-size: 13.5px; color: var(--text); background: var(--green-light); border-left: 3px solid var(--green); padding: 10px 14px; margin: 0 0 18px; line-height: 1.45; border-radius: 3px; }
 
 /* Buttons */
 .gsr-btn-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
@@ -148,6 +150,7 @@ var P = {
     ribo:  { name: 'RNA-seq: Ribo(-)',  price: 93.05, defaultReads: 40, recCycles: 100 },
     e3end: { name: "RNA-seq: 3'-End",   price: 48.73, defaultReads: 10, recCycles: 100 },
     tcr:   { name: 'TCR-seq',           price: 103.94, defaultReads: 5, recCycles: 600 },
+    bcr:   { name: 'BCR-seq',           price: 103.94, defaultReads: 5, recCycles: 600 },
     dna:   { name: 'DNA-seq',           price: 56.87, defaultReads: 30, recCycles: 300 }
   },
 
@@ -189,6 +192,22 @@ var P = {
     mouse: { name: 'Infinium Mouse Methylation', price: 250.03 }
   },
   epicFFPERestoration: 123.84   // FFPE restoration reagent, EPIC arrays only (FY27)
+};
+
+// ─── GMBSR INTAKE FORM ─────────────────────────────────────────────────────
+// Smartsheet form pre-fill uses column IDs from the GMBSR Task Sheet.
+var GMBSR_FORM = {
+  url: 'https://app.smartsheet.com/b/form/d5270695c4ea4610b5608cda034b4a1b',
+  cols: { workflow: '819681933086596', samples: '1389100344233860', notes: '183706714066820' }
+};
+// Maps calculator assay/platform IDs to the Smartsheet "Workflow" picklist values.
+// Lossy mappings (e.g. sc 3'/5' merged, Xenium 5K collapsed, HIVE missing) are
+// noted in the Notes field rather than misrepresented in Workflow.
+var WORKFLOW_MAP = {
+  bulk:    { ribo:'RNAseq Ribo (-)', e3end:'RNAseq 3p', tcr:'TCR-seq', bcr:'BCR-seq', dna:'DNAseq' },
+  sc:      { rna35:'10x 3p', atac:'10x ATAC', multiome:'10x Multiome', flex:'10x Flex' },
+  spatial: { visiumhd:'Visium HD', xenium:'Xenium', xenium5k:'Xenium' },
+  arrays:  { epic:'Methylation array', mouse:'Methylation array' }
 };
 
 // ─── LABOR ─────────────────────────────────────────────────────────────────
@@ -280,7 +299,7 @@ function renderProgress() {
 // ─── STEP: START ───────────────────────────────────────────────────────────
 function renderStart() {
   var cats = [
-    ['bulk',    '🧬', 'Bulk DNA/RNA Sequencing',  "RNA-seq (Ribo-, 3'-End), TCR-seq, or DNA-seq"],
+    ['bulk',    '🧬', 'Bulk DNA/RNA Sequencing',  "RNA-seq (Ribo-, 3'-End), TCR-seq, BCR-seq, or DNA-seq"],
     ['sc',      '🔬', 'Single Cell Genomics',      '10x Chromium: RNA-seq, ATAC, Multiome, Flex'],
     ['spatial', '🗺️', 'Spatial Genomics',          'Visium HD or Xenium in situ'],
     ['arrays',  '🧫', 'Illumina Arrays',            'EPIC Human or Infinium Mouse Methylation arrays']
@@ -811,28 +830,102 @@ function summaryHTML(title, subtitle, lines, extraNote) {
     return mainRow + noteRow;
   }).join('');
 
-  return '<div class="gsr-step-title">' + title + '</div>' +
-    '<p class="gsr-step-desc">' + subtitle + '</p>' +
-    (extraNote || '') +
-    '<div class="gsr-summary-box">' +
-      '<table class="gsr-summary-table">' +
-        '<thead><tr><th>Line item</th><th>Quantity</th>' +
-        '<th class="right">Unit price</th><th class="right">Subtotal</th></tr></thead>' +
-        '<tbody>' + rows +
-          '<tr class="total-row">' +
-            '<td colspan="3">Estimated Total</td>' +
-            '<td class="right">$' + fmt(total) + '</td>' +
-          '</tr>' +
-        '</tbody>' +
-      '</table>' +
+  // Stash for the GMBSR submit handler (PDF generation + form pre-fill).
+  window.__gsrSummary = { title: title, subtitle: subtitle, total: total };
+
+  return '<div id="gsr-pdf-target">' +
+      '<div class="gsr-step-title">' + title + '</div>' +
+      '<p class="gsr-step-desc">' + subtitle + '</p>' +
+      (extraNote || '') +
+      '<div class="gsr-summary-box">' +
+        '<table class="gsr-summary-table">' +
+          '<thead><tr><th>Line item</th><th>Quantity</th>' +
+          '<th class="right">Unit price</th><th class="right">Subtotal</th></tr></thead>' +
+          '<tbody>' + rows +
+            '<tr class="total-row">' +
+              '<td colspan="3">Estimated Total</td>' +
+              '<td class="right">$' + fmt(total) + '</td>' +
+            '</tr>' +
+          '</tbody>' +
+        '</table>' +
+      '</div>' +
+      '<p class="gsr-disclaimer">This is an estimate only, based on FY27 internal (Dartmouth) rates. ' +
+      'Actual costs may vary depending on experimental complexity and final scope. ' +
+      '<a href="mailto:gmbsr@groups.dartmouth.edu">Contact the GSR</a> to discuss your project and receive a formal quote.</p>' +
     '</div>' +
-    '<p class="gsr-disclaimer">This is an estimate only, based on FY27 internal (Dartmouth) rates. ' +
-    'Actual costs may vary depending on experimental complexity and final scope. ' +
-    '<a href="mailto:gmbsr@groups.dartmouth.edu">Contact the GSR</a> to discuss your project and receive a formal quote.</p>' +
+    '<p class="gsr-submit-help">Ready to start your project? The button below downloads this estimate as a PDF and opens the GMBSR intake form (with the workflow and sample count pre-filled). Attach the downloaded PDF and complete the remaining fields to submit.</p>' +
     '<div class="gsr-btn-row">' +
       '<button class="gsr-btn gsr-btn-ghost" data-action="startOver">← Start Over</button>' +
-      '<button class="gsr-btn gsr-btn-primary" onclick="window.print()">Print Estimate</button>' +
+      '<button class="gsr-btn gsr-btn-secondary" onclick="window.print()">Print Estimate</button>' +
+      '<button class="gsr-btn gsr-btn-primary" data-action="submitGMBSR">Submit Project Request →</button>' +
     '</div>';
+}
+
+// ─── SUBMIT TO GMBSR ───────────────────────────────────────────────────────
+function buildGmbsrPayload() {
+  var wf = [], samples = 0, extras = [];
+  if (S.category === 'bulk') {
+    if (WORKFLOW_MAP.bulk[S.bulkAssay]) wf.push(WORKFLOW_MAP.bulk[S.bulkAssay]);
+    if (S.bulkExtraction) {
+      var isDna = S.bulkAssay === 'dna';
+      wf.push((isDna ? 'DNA' : 'RNA') + (S.bulkFFPE ? ' FFPE extraction' : ' extraction'));
+    }
+    if (S.bulkQC) extras.push('Sample QC requested');
+    samples = S.bulkSamples;
+  } else if (S.category === 'sc') {
+    if (WORKFLOW_MAP.sc[S.scPlatform]) wf.push(WORKFLOW_MAP.sc[S.scPlatform]);
+    else if (S.scPlatform === 'hive') extras.push('Platform: Honeycomb HIVE (no matching Workflow option)');
+    if (S.scPlatform === 'rna35') extras.push('Confirm 3′ vs 5′ chemistry on intake');
+    if (S.scTissuePrep) extras.push('Tissue/cell prep requested');
+    if (S.scFixation) extras.push('Sample fixation requested');
+    samples = S.scSamples;
+  } else if (S.category === 'spatial') {
+    if (WORKFLOW_MAP.spatial[S.spatialPlatform]) wf.push(WORKFLOW_MAP.spatial[S.spatialPlatform]);
+    if (S.spatialPlatform === 'xenium5k') extras.push('Xenium panel: 5K');
+    if (S.spatialPlatform === 'xenium') extras.push('Xenium panel: Standard');
+    if (S.spatialTissuePrep) extras.push('Tissue prep requested');
+    samples = S.spatialSlides;
+  } else if (S.category === 'arrays') {
+    if (WORKFLOW_MAP.arrays[S.arrayAssay]) wf.push(WORKFLOW_MAP.arrays[S.arrayAssay]);
+    if (S.arrayFFPE) wf.push('+FFPE restoration');
+    extras.push('Array type: ' + (S.arrayAssay === 'epic' ? 'EPIC (Human)' : 'Infinium Mouse'));
+    samples = S.arraySamples;
+  }
+
+  var s = window.__gsrSummary || {};
+  var notes = ['GSR Cost Estimator submission'];
+  if (s.title) notes.push(s.title);
+  if (samples) notes.push('Samples: ' + samples);
+  if (typeof s.total === 'number') notes.push('Estimated total: $' + fmt(s.total));
+  if (extras.length) notes.push('', 'Details:', '  - ' + extras.join('\n  - '));
+  notes.push('', 'Generated ' + new Date().toLocaleDateString() + '. PDF estimate attached separately.');
+
+  return { workflow: wf, samples: samples, notes: notes.join('\n') };
+}
+
+function submitToGMBSR() {
+  if (typeof html2pdf === 'undefined') {
+    alert('PDF library still loading — please try again in a moment.');
+    return;
+  }
+  var payload = buildGmbsrPayload();
+  var target = document.getElementById('gsr-pdf-target');
+  if (!target) return;
+
+  var stamp = new Date().toISOString().slice(0, 10);
+  html2pdf().set({
+    margin: 0.5,
+    filename: 'GSR-cost-estimate-' + stamp + '.pdf',
+    image: { type: 'jpeg', quality: 0.95 },
+    html2canvas: { scale: 2, useCORS: true },
+    jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+  }).from(target).save();
+
+  var p = new URLSearchParams();
+  if (payload.workflow.length) p.set(GMBSR_FORM.cols.workflow, payload.workflow.join('\n'));
+  if (payload.samples) p.set(GMBSR_FORM.cols.samples, String(payload.samples));
+  p.set(GMBSR_FORM.cols.notes, payload.notes);
+  window.open(GMBSR_FORM.url + '?' + p.toString(), '_blank', 'noopener');
 }
 
 // ─── HELPERS ───────────────────────────────────────────────────────────────
@@ -985,6 +1078,7 @@ function handleClick(e) {
     case 'goTo':   saveInputs(); goTo(val); break;
     case 'back':   saveInputs(); goBack(); break;
     case 'startOver': S = freshState(); currentStep = 'start'; render(); break;
+    case 'submitGMBSR': submitToGMBSR(); break;
   }
 }
 
