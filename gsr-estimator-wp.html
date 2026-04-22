@@ -66,9 +66,11 @@ body { font-family: Arial, sans-serif; color: var(--text); font-size: 16px; back
 .gsr-run-options { margin-bottom: 22px; }
 .gsr-run-options h4 { font-size: 15px; font-weight: 700; color: var(--green); margin-bottom: 10px; }
 .gsr-run-scroll { overflow-x: auto; }
-table.gsr-run-table { width: 100%; border-collapse: collapse; font-size: 13.5px; white-space: nowrap; }
-table.gsr-run-table th  { background: var(--green); color: #fff; padding: 9px 11px; text-align: left; }
-table.gsr-run-table td  { padding: 9px 11px; border-bottom: 1px solid #e5e5e5; vertical-align: middle; }
+table.gsr-run-table { width: 100%; border-collapse: collapse; font-size: 13.5px; table-layout: fixed; }
+table.gsr-run-table th  { background: var(--green); color: #fff; padding: 9px 11px; text-align: left; white-space: nowrap; }
+table.gsr-run-table th:first-child { width: 40%; }
+table.gsr-run-table td  { padding: 9px 11px; border-bottom: 1px solid #e5e5e5; vertical-align: middle; white-space: nowrap; }
+table.gsr-run-table td:first-child { white-space: normal; word-wrap: break-word; }
 table.gsr-run-table tr:last-child td { border-bottom: none; }
 table.gsr-run-table tr.rec-row   td { background: var(--green-light); }
 table.gsr-run-table td.run-name { font-weight: 500; }
@@ -143,9 +145,9 @@ var P = {
 
   // readsM: maximum reads output per run; cycles: kit cycle length
   runs: [
-    { id:'partial_10m',  name:'Partial run — 10M reads',  price:53.33,    readsM:10,   cycles:100 },
-    { id:'partial_50m',  name:'Partial run — 50M reads',  price:151.81,   readsM:50,   cycles:100 },
-    { id:'partial_250m', name:'Partial run — 250M reads', price:803.50,   readsM:250,  cycles:100 },
+    { id:'partial_10m',  name:'10M reads',  price:53.33,    readsM:10,   cycles:100 },
+    { id:'partial_50m',  name:'50M reads',  price:151.81,   readsM:50,   cycles:100 },
+    { id:'partial_250m', name:'250M reads', price:803.50,   readsM:250,  cycles:100 },
     { id:'p1_100', name:'NextSeq P1 100-cycle', price:1181.38,  readsM:120,  cycles:100 },
     { id:'p1_300', name:'NextSeq P1 300-cycle', price:1415.88,  readsM:120,  cycles:300 },
     { id:'p1_600', name:'NextSeq P1 600-cycle', price:2005.13,  readsM:120,  cycles:600 },
