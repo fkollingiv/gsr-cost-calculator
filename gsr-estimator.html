@@ -989,6 +989,30 @@ function handleClick(e) {
 }
 
 render();
+
+// Notify parent window of our height so an embedding iframe can auto-size.
+(function () {
+  if (window.parent === window) return;
+  var lastHeight = 0;
+  function postHeight() {
+    var h = Math.max(
+      document.documentElement.scrollHeight,
+      document.body ? document.body.scrollHeight : 0
+    );
+    if (h !== lastHeight) {
+      lastHeight = h;
+      window.parent.postMessage({ type: 'gsr-estimator:height', height: h }, '*');
+    }
+  }
+  window.addEventListener('load', postHeight);
+  window.addEventListener('resize', postHeight);
+  if (typeof ResizeObserver !== 'undefined') {
+    new ResizeObserver(postHeight).observe(document.documentElement);
+  } else {
+    setInterval(postHeight, 500);
+  }
+  postHeight();
+})();
 </script>
 </body>
 </html>
