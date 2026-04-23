@@ -195,10 +195,11 @@ var P = {
 };
 
 // ─── GMBSR INTAKE FORM ─────────────────────────────────────────────────────
-// Smartsheet form pre-fill uses column IDs from the GMBSR Task Sheet.
+// Smartsheet form pre-fill uses the exact column NAMES (not IDs) as URL keys.
+// The named columns must also be exposed on the form for pre-fill to take effect.
 var GMBSR_FORM = {
   url: 'https://app.smartsheet.com/b/form/d5270695c4ea4610b5608cda034b4a1b',
-  cols: { workflow: '819681933086596', samples: '1389100344233860', notes: '183706714066820' }
+  cols: { workflow: 'Workflow', samples: 'Number of samples', notes: 'Notes' }
 };
 // Maps calculator assay/platform IDs to the Smartsheet "Workflow" picklist values.
 // Lossy mappings (e.g. sc 3'/5' merged, Xenium 5K collapsed, HIVE missing) are

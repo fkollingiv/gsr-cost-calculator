@@ -187,9 +187,10 @@ var P = {
 };
 
 // ─── GMBSR INTAKE FORM ─────────────────────────────────────────────────────
+// Smartsheet form pre-fill uses exact column NAMES (not IDs) as URL keys.
 var GMBSR_FORM = {
   url: 'https://app.smartsheet.com/b/form/d5270695c4ea4610b5608cda034b4a1b',
-  cols: { workflow: '819681933086596', samples: '1389100344233860', notes: '183706714066820' }
+  cols: { workflow: 'Workflow', samples: 'Number of samples', notes: 'Notes' }
 };
 var WORKFLOW_MAP = {
   bulk:    { ribo:'RNAseq Ribo (-)', e3end:'RNAseq 3p', tcr:'TCR-seq', bcr:'BCR-seq', dna:'DNAseq' },
