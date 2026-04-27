@@ -395,6 +395,11 @@ function buildRunRows(options, recRun, recCycles, radioName, selectedId) {
   }).join('');
 }
 
+function bulkTotalHtml(totalM, n, rps) {
+  return '<strong>' + totalM.toLocaleString() + 'M</strong>' +
+    ' (' + n + ' sample' + (n > 1 ? 's' : '') + ' × ' + rps + 'M)';
+}
+
 function renderBulkReads() {
   var assay    = P.bulk[S.bulkAssay];
   var rps      = S.bulkReadsPerSample !== null ? S.bulkReadsPerSample : assay.defaultReads;
@@ -404,15 +409,19 @@ function renderBulkReads() {
   if (!S.bulkRun) S.bulkRun = rec.id;
 
   return '<div class="gsr-step-title">Sequencing configuration</div>' +
-    '<p class="gsr-step-desc">Adjust reads per sample if needed, then select a sequencing run type.</p>' +
+    '<p class="gsr-step-desc">Adjust sample count or reads per sample if needed, then select a sequencing run type.</p>' +
     '<div class="gsr-reads-box">' +
-      '<div class="reads-header">Reads per sample — ' + assay.name + '</div>' +
+      '<div class="reads-header">Sequencing depth — ' + assay.name + '</div>' +
+      '<div class="gsr-reads-row">' +
+        '<input type="number" id="bulkSamplesLive" min="1" max="9999" value="' + S.bulkSamples + '">' +
+        '<span>samples</span>' +
+      '</div>' +
       '<div class="gsr-reads-row">' +
         '<input type="number" id="readsInput" min="1" value="' + rps + '">' +
         '<span>million reads per sample</span>' +
       '</div>' +
-      '<div class="gsr-reads-total">Total reads needed: <strong id="totalDisplay">' +
-        totalM.toLocaleString() + 'M</strong> (' + S.bulkSamples + ' samples × ' + rps + 'M)</div>' +
+      '<div class="gsr-reads-total">Total reads needed: <span id="totalDisplay">' +
+        bulkTotalHtml(totalM, S.bulkSamples, rps) + '</span></div>' +
       '<div class="gsr-rec-note">Recommended kit for this assay: <strong>' + assay.recCycles + '-cycle</strong></div>' +
     '</div>' +
     '<div class="gsr-run-options"><h4>Select a sequencing run</h4>' +
@@ -935,6 +944,7 @@ function navBtns(back, next, nextDisabled, nextLabel) {
 function saveInputs() {
   var v;
   v = document.getElementById('bulkSamples');      if (v) S.bulkSamples    = Math.max(1, parseInt(v.value)||1);
+  v = document.getElementById('bulkSamplesLive');  if (v) S.bulkSamples    = Math.max(1, parseInt(v.value)||1);
   v = document.getElementById('bulkExtraction');   if (v) S.bulkExtraction  = v.checked;
   v = document.getElementById('bulkFFPE');         if (v) S.bulkFFPE        = v.checked;
   v = document.getElementById('bulkQC');           if (v) S.bulkQC          = v.checked;
@@ -967,26 +977,34 @@ function bindEvents() {
     });
   }
 
-  var ri = document.getElementById('readsInput');
-  if (ri) {
-    ri.addEventListener('input', function() {
-      var rps = Math.max(1, parseInt(this.value)||1);
-      S.bulkReadsPerSample = rps;
-      var totalM = S.bulkSamples * rps;
-      var disp = document.getElementById('totalDisplay');
-      if (disp) disp.textContent = totalM.toLocaleString() + 'M';
-      var tbody = document.getElementById('runTableBody');
-      if (tbody) {
-        var assay   = P.bulk[S.bulkAssay];
-        var options = calcRunOptions(totalM);
-        var rec     = bestRun(options, assay.recCycles);
-        tbody.innerHTML = buildRunRows(options, rec, assay.recCycles);
-        document.querySelectorAll('input[name="runRadio"]').forEach(function(r) {
-          r.addEventListener('change', function() { S.bulkRun = this.value; });
-        });
-      }
-    });
+  function updateBulkTotal() {
+    var assay  = P.bulk[S.bulkAssay];
+    var rps    = S.bulkReadsPerSample !== null ? S.bulkReadsPerSample : assay.defaultReads;
+    var totalM = S.bulkSamples * rps;
+    var disp   = document.getElementById('totalDisplay');
+    if (disp) disp.innerHTML = bulkTotalHtml(totalM, S.bulkSamples, rps);
+    var tbody  = document.getElementById('runTableBody');
+    if (tbody) {
+      var options = calcRunOptions(totalM);
+      var rec     = bestRun(options, assay.recCycles);
+      tbody.innerHTML = buildRunRows(options, rec, assay.recCycles);
+      document.querySelectorAll('input[name="runRadio"]').forEach(function(r) {
+        r.addEventListener('change', function() { S.bulkRun = this.value; });
+      });
+    }
   }
+
+  var bulkSampLive = document.getElementById('bulkSamplesLive');
+  if (bulkSampLive) bulkSampLive.addEventListener('input', function() {
+    S.bulkSamples = Math.max(1, parseInt(this.value)||1);
+    updateBulkTotal();
+  });
+
+  var ri = document.getElementById('readsInput');
+  if (ri) ri.addEventListener('input', function() {
+    S.bulkReadsPerSample = Math.max(1, parseInt(this.value)||1);
+    updateBulkTotal();
+  });
 
   document.querySelectorAll('input[name="runRadio"]').forEach(function(r) {
     r.addEventListener('change', function() { S.bulkRun = this.value; });
