@@ -496,6 +496,13 @@ function renderSCPlatform() {
 }
 
 // ─── STEP: SC PARAMS ───────────────────────────────────────────────────────
+function scTotalHtml(totalM, runMult, cells, rpc) {
+  return '<strong>' + Math.round(totalM * runMult).toLocaleString() + 'M</strong>' +
+    ' (' + S.scSamples + ' sample' + (S.scSamples > 1 ? 's' : '') + ' × ' +
+    cells.toLocaleString() + ' cells × ' + rpc.toLocaleString() + ' reads' +
+    (runMult > 1 ? ' × 2 libraries' : '') + ')';
+}
+
 function renderSCParams() {
   var isFlex     = S.scPlatform === 'flex';
   var hasSeq     = ['flex','rna35','atac','multiome'].indexOf(S.scPlatform) !== -1;
@@ -549,11 +556,8 @@ function renderSCParams() {
           '<input type="number" id="scReadsInput" min="1" value="' + rpc + '">' +
           '<span>reads per cell <em>(recommended: ' + defRpc.toLocaleString() + ')</em>' + multiomeNote + '</span>' +
         '</div>' +
-        '<div class="gsr-reads-total">Total reads needed: <strong id="scTotalDisplay">' +
-          Math.round(totalM * runMult).toLocaleString() + 'M</strong>' +
-          ' (' + S.scSamples + ' sample' + (S.scSamples > 1 ? 's' : '') + ' × ' +
-          cells.toLocaleString() + ' cells × ' + rpc.toLocaleString() + ' reads' +
-          (runMult > 1 ? ' × 2 libraries' : '') + ')</div>' +
+        '<div class="gsr-reads-total">Total reads needed: <span id="scTotalDisplay">' +
+          scTotalHtml(totalM, runMult, cells, rpc) + '</span></div>' +
         '<div class="gsr-rec-note">Recommended kit: <strong>100-cycle</strong></div>' +
       '</div>' +
       '<div class="gsr-run-options"><h4>Select a sequencing run</h4>' +
@@ -843,7 +847,8 @@ function summaryHTML(title, subtitle, lines, extraNote) {
     '</div>' +
     '<p class="gsr-submit-help">Ready to start your project? The button below downloads this estimate as a PDF and opens the GMBSR intake form (with the workflow and sample count pre-filled). Attach the downloaded PDF and complete the remaining fields to submit.</p>' +
     '<div class="gsr-btn-row">' +
-      '<button class="gsr-btn gsr-btn-ghost" data-action="startOver">← Start Over</button>' +
+      '<button class="gsr-btn gsr-btn-secondary" data-action="back">← Back</button>' +
+      '<button class="gsr-btn gsr-btn-ghost" data-action="startOver">Start Over</button>' +
       '<button class="gsr-btn gsr-btn-secondary" onclick="window.print()">Print Estimate</button>' +
       '<button class="gsr-btn gsr-btn-primary" data-action="submitGMBSR">Submit Project Request →</button>' +
     '</div>';
@@ -993,7 +998,7 @@ function bindEvents() {
     var totalM  = S.scSamples * cells * rpc / 1e6;
     var runMult = S.scPlatform === 'multiome' ? 2 : 1;
     var disp    = document.getElementById('scTotalDisplay');
-    if (disp) disp.textContent = Math.round(totalM * runMult).toLocaleString() + 'M';
+    if (disp) disp.innerHTML = scTotalHtml(totalM, runMult, cells, rpc);
     var tbody = document.getElementById('scRunTableBody');
     if (tbody) {
       var options = calcRunOptions(totalM, S.scSamples).map(function(r) {
@@ -1008,6 +1013,12 @@ function bindEvents() {
       });
     }
   }
+
+  var scSamp = document.getElementById('scSamples');
+  if (scSamp) scSamp.addEventListener('input', function() {
+    S.scSamples = Math.max(1, parseInt(this.value)||1);
+    updateSCTotal();
+  });
 
   var flexCi = document.getElementById('scCellsInput');
   if (flexCi) flexCi.addEventListener('input', function() {
