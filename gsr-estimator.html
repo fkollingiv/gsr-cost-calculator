@@ -174,11 +174,12 @@ var P = {
   ],
 
   sc: {
-    rna35:    { name: "10x 3'/5' RNA-seq",         price: 1668.50 },
-    atac:     { name: '10x ATAC-seq',              price: 1986.00 },
-    multiome: { name: '10x Multiome (RNA + ATAC)', price: 3107.25 },
+    rna35:    { name: "10x 3'/5' RNA-seq",                   price: 1668.50 },
+    ocm:      { name: "10x 3'/5' RNA-seq OCM (multiplexed)", price: 1759.50 },
+    atac:     { name: '10x ATAC-seq',                        price: 1986.00 },
+    multiome: { name: '10x Multiome (RNA + ATAC)',           price: 3107.25 },
     flex:     { name: '10x Flex', runPrice: 422.97, samplePrice: 307.51 },
-    hive:     { name: 'Honeycomb HIVE',            price:  837.77 }
+    hive:     { name: 'Honeycomb HIVE',                      price:  837.77 }
   },
 
   spatial: {
@@ -206,7 +207,7 @@ var GMBSR_FORM = {
 // noted in the Notes field rather than misrepresented in Workflow.
 var WORKFLOW_MAP = {
   bulk:    { ribo:'RNAseq Ribo (-)', e3end:'RNAseq 3p', tcr:'TCR-seq', bcr:'BCR-seq', dna:'DNAseq' },
-  sc:      { rna35:'10x 3p', atac:'10x ATAC', multiome:'10x Multiome', flex:'10x Flex' },
+  sc:      { rna35:'10x 3p', ocm:'10x 3p', atac:'10x ATAC', multiome:'10x Multiome', flex:'10x Flex' },
   spatial: { visiumhd:'Visium HD', xenium:'Xenium', xenium5k:'Xenium' },
   arrays:  { epic:'Methylation array', mouse:'Methylation array' }
 };
@@ -499,6 +500,7 @@ function renderBulkSummary() {
 function renderSCPlatform() {
   var plats = [
     ['rna35',    "10x 3'/5' RNA-seq",         'Gene expression profiling'],
+    ['ocm',      "10x 3'/5' RNA-seq OCM",     'On-Chip Multiplexing — 4 samples per lane'],
     ['atac',     '10x ATAC-seq',              'Chromatin accessibility'],
     ['multiome', '10x Multiome (RNA + ATAC)', 'Both modalities from the same cells'],
     ['flex',     '10x Flex',                  'Fixed/FFPE samples; base run + per-sample cost'],
@@ -524,10 +526,27 @@ function scTotalHtml(totalM, runMult, cells, rpc) {
     (runMult > 1 ? ' × 2 libraries' : '') + ')';
 }
 
+// OCM: 4 samples per lane, max 5,000 cells per sample per lane.
+// If cells/sample > 5,000, each sample uses ⌈cells/5000⌉ slots.
+function ocmLanes(samples, cells) {
+  return Math.ceil(samples * Math.ceil(cells / 5000) / 4);
+}
+function ocmLanesHtml(samples, cells) {
+  var slotsPerSample = Math.ceil(cells / 5000);
+  var totalSlots     = samples * slotsPerSample;
+  var lanes          = Math.ceil(totalSlots / 4);
+  var detail = slotsPerSample > 1
+    ? ' (' + samples + ' sample' + (samples > 1 ? 's' : '') + ' × ' + slotsPerSample +
+      ' slots/sample = ' + totalSlots + ' slots, 4 slots/lane)'
+    : ' (' + samples + ' sample' + (samples > 1 ? 's' : '') + ', 4 samples/lane)';
+  return '<strong>' + lanes + ' lane' + (lanes > 1 ? 's' : '') + '</strong>' + detail;
+}
+
 function renderSCParams() {
   var isFlex     = S.scPlatform === 'flex';
-  var hasSeq     = ['flex','rna35','atac','multiome'].indexOf(S.scPlatform) !== -1;
-  var noFixation = ['flex','atac','multiome','rna35'].indexOf(S.scPlatform) !== -1;
+  var isOCM      = S.scPlatform === 'ocm';
+  var hasSeq     = ['flex','rna35','ocm','atac','multiome'].indexOf(S.scPlatform) !== -1;
+  var noFixation = ['flex','ocm','atac','multiome','rna35'].indexOf(S.scPlatform) !== -1;
 
   // Add-ons section
   var addOns = isFlex
@@ -548,10 +567,10 @@ function renderSCParams() {
         '<div class="cb-price">$' + P.tissueCellPrep.toFixed(2) + '/sample</div></span>' +
       '</label>';
 
-  // Sequencing section (Flex, 3'/5' RNA, ATAC, Multiome)
+  // Sequencing section (Flex, 3'/5' RNA, OCM, ATAC, Multiome)
   var scSeq = '';
   if (hasSeq) {
-    var defRpc  = S.scPlatform === 'rna35' ? 30000 : 25000;
+    var defRpc  = (S.scPlatform === 'rna35' || isOCM) ? 30000 : 25000;
     var cells   = S.scCellsPerSample || 5000;
     var rpc     = S.scReadsPerCell   || defRpc;
     var totalM  = S.scSamples * cells * rpc / 1e6;
@@ -565,13 +584,17 @@ function renderSCParams() {
     if (!S.scRun) S.scRun = rec.id;
     var multiomeNote = S.scPlatform === 'multiome'
       ? ' <em>× 2 runs (RNA + ATAC libraries)</em>' : '';
+    var ocmLanesRow = isOCM
+      ? '<div class="gsr-reads-total" style="margin-top:6px">OCM lanes needed: <span id="scOcmLanesDisplay">' +
+          ocmLanesHtml(S.scSamples, cells) + '</span></div>'
+      : '';
     scSeq =
       '<hr class="gsr-divider">' +
       '<div class="gsr-reads-box">' +
         '<div class="reads-header">Sequencing depth</div>' +
         '<div class="gsr-reads-row">' +
           '<input type="number" id="scCellsInput" min="1" value="' + cells + '">' +
-          '<span>cells per sample</span>' +
+          '<span>cells per sample' + (isOCM ? ' <em>(max 5,000/lane; >5,000 uses extra slots)</em>' : '') + '</span>' +
         '</div>' +
         '<div class="gsr-reads-row">' +
           '<input type="number" id="scReadsInput" min="1" value="' + rpc + '">' +
@@ -579,6 +602,7 @@ function renderSCParams() {
         '</div>' +
         '<div class="gsr-reads-total">Total reads needed: <span id="scTotalDisplay">' +
           scTotalHtml(totalM, runMult, cells, rpc) + '</span></div>' +
+        ocmLanesRow +
         '<div class="gsr-rec-note">Recommended kit: <strong>100-cycle</strong></div>' +
       '</div>' +
       '<div class="gsr-run-options"><h4>Select a sequencing run</h4>' +
@@ -595,15 +619,24 @@ function renderSCParams() {
       '</div>';
   }
 
+  var introDesc = isFlex
+    ? 'Flex pricing: one base run cost plus a per-sample cost.'
+    : isOCM
+      ? 'OCM combines up to 4 samples into a single lane (max 5,000 cells per sample per lane). ' +
+        'Library prep is billed per lane ($' + P.sc.ocm.price.toFixed(2) + '/lane).'
+      : 'Enter the number of samples for your experiment.';
+  var sampleNote = isFlex
+    ? '<div class="field-note">Run: $' + P.sc.flex.runPrice.toFixed(2) +
+      ' + $' + P.sc.flex.samplePrice.toFixed(2) + '/sample</div>'
+    : isOCM
+      ? '<div class="field-note">4 samples per lane · $' + P.sc.ocm.price.toFixed(2) + '/lane library prep</div>'
+      : '';
   return '<div class="gsr-step-title">Experiment parameters</div>' +
-    '<p class="gsr-step-desc">' +
-    (isFlex ? 'Flex pricing: one base run cost plus a per-sample cost.' : 'Enter the number of samples for your experiment.') +
-    '</p>' +
+    '<p class="gsr-step-desc">' + introDesc + '</p>' +
     '<div class="gsr-field">' +
       '<label for="scSamples">Number of samples</label>' +
       '<input class="gsr-input-num" type="number" id="scSamples" min="1" max="9999" value="' + S.scSamples + '">' +
-      (isFlex ? '<div class="field-note">Run: $' + P.sc.flex.runPrice.toFixed(2) +
-        ' + $' + P.sc.flex.samplePrice.toFixed(2) + '/sample</div>' : '') +
+      sampleNote +
     '</div>' +
     '<hr class="gsr-divider">' +
     '<div class="gsr-field"><label>Optional add-ons</label>' +
@@ -617,17 +650,32 @@ function renderSCParams() {
 function renderSCSummary() {
   var n      = S.scSamples;
   var isFlex = S.scPlatform === 'flex';
+  var isOCM  = S.scPlatform === 'ocm';
   var pl     = P.sc[S.scPlatform];
-  var labor  = calcLabor('sc', n);
   var lines  = [];
 
-  var hasSeq = ['flex','rna35','atac','multiome'].indexOf(S.scPlatform) !== -1;
+  var hasSeq = ['flex','rna35','ocm','atac','multiome'].indexOf(S.scPlatform) !== -1;
+
+  // OCM labor and prep are billed per lane (4 user samples = 1 lane).
+  var ocmCellsForLanes = S.scCellsPerSample || 5000;
+  var lanes  = isOCM ? ocmLanes(n, ocmCellsForLanes) : 0;
+  var labor  = calcLabor('sc', isOCM ? lanes : n);
 
   if (isFlex) {
     lines.push({ label:'10x Flex — Run cost',   qty:1, unit:P.sc.flex.runPrice,    qtyl:'run'     });
     lines.push({ label:'10x Flex — Per sample', qty:n, unit:P.sc.flex.samplePrice, qtyl:'samples' });
     if (S.scTissuePrep)
       lines.push({ label:'Tissue/cell prep and fixation', qty:n, unit:P.flexTissuePrepFixation, qtyl:'samples' });
+  } else if (isOCM) {
+    lines.push({
+      label: pl.name,
+      qty: lanes, unit: pl.price, qtyl: 'lanes',
+      note: n + ' sample' + (n>1?'s':'') + ' multiplexed at 4/lane' +
+            (Math.ceil(ocmCellsForLanes / 5000) > 1
+              ? ' · ' + Math.ceil(ocmCellsForLanes / 5000) + ' slots/sample for >5,000 cells/sample'
+              : '')
+    });
+    if (S.scTissuePrep) lines.push({ label:'Tissue/cell preparation', qty:n, unit:P.tissueCellPrep, qtyl:'samples' });
   } else {
     lines.push({ label:pl.name, qty:n, unit:pl.price, qtyl:'samples' });
     if (S.scFixation)   lines.push({ label:'Sample fixation (10x)',   qty:n, unit:P.sampleFixation, qtyl:'samples' });
@@ -636,7 +684,7 @@ function renderSCSummary() {
   if (hasSeq && S.scRun) {
     var scRunData  = P.runs.find(function(r) { return r.id === S.scRun; });
     var scCells    = S.scCellsPerSample || 5000;
-    var scRpc      = S.scReadsPerCell   || (S.scPlatform === 'rna35' ? 30000 : 25000);
+    var scRpc      = S.scReadsPerCell   || ((S.scPlatform === 'rna35' || isOCM) ? 30000 : 25000);
     var scTotalM   = n * scCells * scRpc / 1e6;
     var scRunMult  = S.scPlatform === 'multiome' ? 2 : 1;
     var scNumRuns  = Math.ceil(scTotalM / scRunData.readsM) * scRunMult;
@@ -650,11 +698,13 @@ function renderSCSummary() {
           ' cells × ' + scRpc.toLocaleString() + ' reads/cell'
     });
   }
+  var laborUnitLabel = isOCM ? 'lanes' : 'samples';
   lines.push({
     label: 'Labor',
     qty: labor.hours, unit: P.laborRate, qtyl: 'hrs',
     note: labor.batches + ' batch' + (labor.batches > 1 ? 'es' : '') +
-          ' of up to ' + labor.batchSize + ' samples × ' + labor.hrsPerBatch + ' hrs @ $' + fmt(P.laborRate) + '/hr'
+          ' of up to ' + labor.batchSize + ' ' + laborUnitLabel +
+          ' × ' + labor.hrsPerBatch + ' hrs @ $' + fmt(P.laborRate) + '/hr'
   });
 
   var seqNote = hasSeq ? '' :
@@ -663,9 +713,13 @@ function renderSCSummary() {
     '100-cycle kits are recommended for most single cell workflows. ' +
     '<a href="/gsr/contact/" style="color:var(--green-dark)">Contact the GSR</a> to discuss sequencing options for your project.</div>';
 
+  var subtitle = n + ' sample' + (n>1?'s':'') +
+    (isOCM ? ' (' + lanes + ' OCM lane' + (lanes > 1 ? 's' : '') + ')' : '') +
+    ' · ' + (isFlex ? '10x Flex' : pl.name);
+
   return summaryHTML(
     'Single Cell Estimate',
-    n + ' sample' + (n>1?'s':'') + ' · ' + (isFlex ? '10x Flex' : pl.name),
+    subtitle,
     lines,
     seqNote
   );
@@ -890,7 +944,12 @@ function buildGmbsrPayload() {
   } else if (S.category === 'sc') {
     if (WORKFLOW_MAP.sc[S.scPlatform]) wf.push(WORKFLOW_MAP.sc[S.scPlatform]);
     else if (S.scPlatform === 'hive') extras.push('Platform: Honeycomb HIVE (no matching Workflow option)');
-    if (S.scPlatform === 'rna35') extras.push('Confirm 3′ vs 5′ chemistry on intake');
+    if (S.scPlatform === 'rna35' || S.scPlatform === 'ocm') extras.push('Confirm 3′ vs 5′ chemistry on intake');
+    if (S.scPlatform === 'ocm') {
+      var ocmCells = S.scCellsPerSample || 5000;
+      extras.push('OCM (multiplexed): ' + ocmLanes(S.scSamples, ocmCells) + ' lane(s) for ' +
+                  S.scSamples + ' user sample(s) at 4/lane');
+    }
     if (S.scTissuePrep) extras.push('Tissue/cell prep requested');
     if (S.scFixation) extras.push('Sample fixation requested');
     samples = S.scSamples;
@@ -1025,11 +1084,13 @@ function bindEvents() {
 
   function updateSCTotal() {
     var cells   = S.scCellsPerSample || 5000;
-    var rpc     = S.scReadsPerCell   || (S.scPlatform === 'rna35' ? 30000 : 25000);
+    var rpc     = S.scReadsPerCell   || ((S.scPlatform === 'rna35' || S.scPlatform === 'ocm') ? 30000 : 25000);
     var totalM  = S.scSamples * cells * rpc / 1e6;
     var runMult = S.scPlatform === 'multiome' ? 2 : 1;
     var disp    = document.getElementById('scTotalDisplay');
     if (disp) disp.innerHTML = scTotalHtml(totalM, runMult, cells, rpc);
+    var laneDisp = document.getElementById('scOcmLanesDisplay');
+    if (laneDisp) laneDisp.innerHTML = ocmLanesHtml(S.scSamples, cells);
     var tbody = document.getElementById('scRunTableBody');
     if (tbody) {
       var options = calcRunOptions(totalM, S.scSamples).map(function(r) {
@@ -1100,7 +1161,7 @@ function handleClick(e) {
       S.arrayAssay = val; render(); break;
     case 'selectSCPlatform':
       S.scPlatform = val;
-      S.scReadsPerCell = val === 'rna35' ? 30000 : 25000;
+      S.scReadsPerCell = (val === 'rna35' || val === 'ocm') ? 30000 : 25000;
       S.scRun = null;
       render(); break;
     case 'selectSpatialPlatform':
