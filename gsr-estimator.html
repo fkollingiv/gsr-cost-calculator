@@ -261,8 +261,17 @@ var STEP_LABELS = {
 var currentStep = 'start';
 function path()    { return S.category ? PATHS[S.category] : ['start']; }
 function stepIdx() { return path().indexOf(currentStep); }
-function goTo(id)  { currentStep = id; render(); }
-function goBack()  { var p = path(), i = p.indexOf(currentStep); if (i > 0) { currentStep = p[i-1]; render(); } }
+function goTo(id)  { currentStep = id; render(); scrollWizardToTop(); }
+function goBack()  { var p = path(), i = p.indexOf(currentStep); if (i > 0) { currentStep = p[i-1]; render(); scrollWizardToTop(); } }
+function scrollWizardToTop() {
+  var el = document.querySelector('.gsr-wizard') || document.getElementById('wizardContent');
+  if (el && typeof el.scrollIntoView === 'function') {
+    el.scrollIntoView({ block: 'start', behavior: 'auto' });
+  }
+  if (window.parent !== window) {
+    try { window.parent.postMessage({ type: 'gsr-estimator:scrollTop' }, '*'); } catch (e) {}
+  }
+}
 
 // ─── RENDER ROUTER ─────────────────────────────────────────────────────────
 function render() {
@@ -1168,7 +1177,7 @@ function handleClick(e) {
       S.spatialPlatform = val; render(); break;
     case 'goTo':   saveInputs(); goTo(val); break;
     case 'back':   saveInputs(); goBack(); break;
-    case 'startOver': S = freshState(); currentStep = 'start'; render(); break;
+    case 'startOver': S = freshState(); currentStep = 'start'; render(); scrollWizardToTop(); break;
     case 'submitGMBSR': submitToGMBSR(); break;
   }
 }
