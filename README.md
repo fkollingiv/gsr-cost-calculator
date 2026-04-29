@@ -21,9 +21,8 @@ A self-contained, browser-based cost estimator for the **Dartmouth Genomics and 
 
 | File | Description |
 |------|-------------|
-| `gsr-estimator.html` | Standalone version — open directly in any browser |
-| `gsr-estimator-wp.html` | WordPress-compatible version — paste into a Custom HTML block (no doctype/body wrappers) |
-| `website-setup-instructions.md` | Step-by-step guide for deploying the calculator on omics.dartmouth.edu and geiselmed.dartmouth.edu/gsr |
+| `gsr-estimator.html` | The estimator — served via GitHub Pages and embedded into the public sites with an iframe |
+| `website-setup-instructions.md` | Step-by-step guide for embedding the calculator on omics.dartmouth.edu and geiselmed.dartmouth.edu/gsr |
 | `FY27 GENOMICS RATE WORKSHEET 4.9.26.xlsx` | Source rate worksheet used to derive the pricing data |
 
 ## Getting Started
@@ -34,16 +33,17 @@ A self-contained, browser-based cost estimator for the **Dartmouth Genomics and 
 4. Review the itemized cost estimate
 5. Print or share the estimate with your collaborators
 
-## Deployment to WordPress
+## Deployment
 
-See `website-setup-instructions.md` for detailed instructions on:
+`gsr-estimator.html` is served via GitHub Pages and embedded on the WordPress sites using an auto-resizing iframe. See `website-setup-instructions.md` for the iframe snippet and step-by-step instructions covering:
+
 1. Creating the calculator page on `omics.dartmouth.edu`
 2. Adding a navigation button to the Genomics and Molecular Biology page
 3. Adding a link on the GSR homepage at `geiselmed.dartmouth.edu/gsr`
 
 ## Updating Rates
 
-Pricing data is stored in the JavaScript `P` object near the top of the script. When rates change for a new fiscal year, update the values in that object — both in the standalone HTML file and in the WordPress Custom HTML block if deployed.
+Pricing data is stored in the JavaScript `P` object near the top of the script. When rates change for a new fiscal year, update the values in that object and push to `main` — GitHub Pages will publish the new version automatically and every embedding page picks it up on next load.
 
 ## Tech Stack
 

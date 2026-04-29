@@ -12,15 +12,38 @@ These instructions walk you through three steps:
 
 **Target URL:** `sites.dartmouth.edu/omics/genomics-and-molecular-biology/genomics-cost-calculator`
 
+The estimator lives at https://fkollingiv.github.io/gsr-cost-calculator/gsr-estimator.html (served by GitHub Pages from the `main` branch of this repository). The WordPress page embeds it with an auto-resizing iframe — no calculator code is pasted into WordPress, so future rate updates ship to every page automatically when the repo is updated.
+
 1. In your WordPress dashboard for `sites.dartmouth.edu/omics`, go to **Pages → Add New**
 2. Set the **Page Title** to: `Genomics Cost Calculator`
 3. Under **Page Attributes** (right sidebar), set the **Parent Page** to: `Genomics and Molecular Biology`
    - This will create the URL: `/genomics-and-molecular-biology/genomics-cost-calculator`
 4. In the page editor, add a **Custom HTML** block (not a paragraph block)
-5. Paste the entire contents of the file **`gsr-estimator-wp.html`** into the Custom HTML block
+5. Paste the snippet below into the Custom HTML block:
+
+```html
+<iframe id="gsrEstimator"
+        src="https://fkollingiv.github.io/gsr-cost-calculator/gsr-estimator.html"
+        style="width:100%; border:0; min-height:800px;"
+        title="GSR Cost Estimator"></iframe>
+<script>
+  (function () {
+    var f = document.getElementById('gsrEstimator');
+    window.addEventListener('message', function (e) {
+      if (!e.data || !e.data.type) return;
+      if (e.data.type === 'gsr-estimator:height' && f) {
+        f.style.height = e.data.height + 'px';
+      } else if (e.data.type === 'gsr-estimator:scrollTop' && f) {
+        f.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      }
+    });
+  })();
+</script>
+```
+
 6. Click **Publish**
 
-> **Tip:** Use the "Preview" button first to make sure the calculator renders correctly before publishing.
+> **Tip:** Use the "Preview" button first to make sure the calculator renders correctly before publishing. The `height` and `scrollTop` messages from the iframe let the wrapper script keep the iframe sized to its content and scroll to the top of the wizard on each step transition.
 
 ---
 
@@ -98,7 +121,6 @@ The GSR homepage has a "Quick Links" section with links to Genomics Services, Da
 
 ## Notes
 
-- The `gsr-estimator-wp.html` file is the WordPress-compatible version — it uses a `<style>` block and inline `<script>` without the `<!DOCTYPE>`, `<html>`, `<head>`, or `<body>` wrappers, so it works inside a WordPress Custom HTML block.
-- The calculator is entirely self-contained (no external dependencies). All CSS, HTML, and JavaScript are in the single file.
-- FY27 internal Dartmouth rates are hardcoded in the JavaScript `P` object at the top of the script. When rates change, update those values directly in the Custom HTML block.
+- The calculator is entirely self-contained (no external dependencies). All CSS, HTML, and JavaScript live in the single `gsr-estimator.html` file served by GitHub Pages.
+- FY27 internal Dartmouth rates are hardcoded in the JavaScript `P` object at the top of the script. To update rates, edit that object on the `main` branch of this repo — GitHub Pages republishes automatically and every embedding page picks up the change on next load.
 - The calculator uses Dartmouth green (`#006845`) as its primary color, which closely matches both sites' branding.
