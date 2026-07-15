@@ -217,7 +217,7 @@ var WORKFLOW_MAP = {
 function calcLabor(type, n) {
   var rate = P.laborRate, hrsPerBatch, batchSize;
   switch (type) {
-    case 'dna':     hrsPerBatch = 6;  batchSize = 48; break;
+    case 'dna':     hrsPerBatch = 4;  batchSize = 48; break;
     case 'rna':     hrsPerBatch = 8;  batchSize = 48; break;
     case 'sc':      hrsPerBatch = 8;  batchSize = 8;  break;
     case 'spatial': hrsPerBatch = 16; batchSize = 1;  break;  // Visium HD: per slide
